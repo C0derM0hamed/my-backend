@@ -2,17 +2,29 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\AuthController;
-use App\Http\Controllers\Api\V1\Public\ServiceController as PublicServiceController;
 use App\Http\Controllers\Api\V1\Customer\OrderController as CustomerOrderController;
-use App\Http\Controllers\Api\V1\Admin\ServiceController as AdminServiceController;
 use App\Http\Controllers\Api\V1\Admin\OrderManagementController;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Controllers\ServiceController;
+
+
 
 Route::prefix('v1')->group(function () {
+   // --- Public Routes (متاح للكل من غير تسجيل دخول) ---
+   // Public
+    Route::get('/services', [ServiceController::class, 'index']);
+    Route::get('/services/{id}', [ServiceController::class, 'show']);
+
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/register', [AuthController::class, 'register']);
-    Route::get('/services', [PublicServiceController::class, 'index']);
-    Route::get('/services/{id}', [PublicServiceController::class, 'show']);
+
+    Route::middleware('auth:sanctum')->group(function () {
+        
+        // --- Admin Routes (للأدمن فقط) ---
+        // Admin Only (حماية مزدوجة: تسجيل دخول + رول أدمن)
+    Route::middleware(['auth:sanctum', EnsureUserHasRole::class . ':admin'])->group(function () {
+        Route::apiResource('services', ServiceController::class)->except(['index', 'show']);
+    });
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
@@ -26,9 +38,16 @@ Route::prefix('v1')->group(function () {
 
         // Admin
         Route::middleware(EnsureUserHasRole::class.':admin')->prefix('admin')->group(function () {
-            Route::post('/services', [AdminServiceController::class, 'store']);
             Route::get('/orders', [OrderManagementController::class, 'index']);
             Route::patch('/orders/{id}/status', [OrderManagementController::class, 'updateStatus']);
         });
+
+        Route::middleware('auth:sanctum')->group(function () {
+        
+        // ✅ ضيف الراوت ده هنا (متاح لأي حد مسجل دخول)
+        Route::get('/orders', [CustomerOrderController::class, 'index']);
+
     });
+    });
+});
 });
